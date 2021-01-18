@@ -1,13 +1,15 @@
 %define         openssl_version 1.1.1g
 Name:           intel-sgx-ssl
 Version:        2.10
-Release:        2
+Release:        3
 Summary:        Intel® Software Guard Extensions SSL
 ExclusiveArch:	x86_64
 License:        OpenSSL and BSD 3-clause "New" or "Revised" License
 URL:            https://github.com/intel/intel-sgx-ssl
 Source0:        https://github.com/intel/intel-sgx-ssl/archive/lin_%{version}_%{openssl_version}.zip
 Source1:        https://www.openssl.org/source/old/1.1.1/openssl-%{openssl_version}.tar.gz
+
+Patch0:         0001-add-ocall-read-write.patch
 
 BuildRequires:  gcc 
 BuildRequires:	libsgx-launch libsgx-urts linux-sgx-sdk
@@ -37,6 +39,7 @@ Requires:       %{name} = %{version}-%{release}
 %prep
 
 %setup -q -n intel-sgx-ssl-lin_2.10_1.1.1g
+%patch0 -p2
 %build
 cp %{SOURCE1} openssl_source/
 cd Linux
@@ -57,7 +60,9 @@ cp   License.txt $RPM_BUILD_ROOT/opt/intel/sgxssl/docs/
 /opt/intel/sgxssl/include/*
 
 %changelog
+* Mon Jan 18 2021 yanlu <yanlu@huawei.com> - 2.10-3
+- add ocall read and write
 * Mon Jan 18 2021 chenmaodong <chenmaodong@huawei.com> - 2.10-2
 - init
-* Thu Dec 29 2020 chenmaodong <chenmaodong@huawei.com> - 2.10-1
+* Tue Dec 29 2020 chenmaodong <chenmaodong@huawei.com> - 2.10-1
 - init
