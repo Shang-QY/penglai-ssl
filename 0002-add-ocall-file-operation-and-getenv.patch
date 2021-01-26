@@ -1,0 +1,700 @@
+From 05d61201781597f53cb7dfcd9508ac0141315131 Mon Sep 17 00:00:00 2001
+From: yanlu <yanlu14@huawei.com>
+Date: Tue, 26 Jan 2021 11:24:43 +0800
+Subject: [PATCH] add ocall file operation and getenv
+
+---
+ .../Linux/build_openssl.sh                    |   2 +-
+ .../Linux/package/include/sgx_tsgxssl.edl     |  12 +
+ .../Linux/package/include/tsgxsslio.h         |   8 +-
+ .../Linux/sgx/libsgx_tsgxssl/tstdio.cpp       | 339 +++++++++++++++---
+ .../Linux/sgx/libsgx_tsgxssl/tstdlib.cpp      |  48 +--
+ .../Linux/sgx/libsgx_usgxssl/ustdio.cpp       |  96 +++++
+ .../Linux/sgx/libsgx_usgxssl/ustdlib.cpp      |  61 ++++
+ .../sgx/test_app/enclave/tests/stdio_func.c   |   4 +-
+ .../openssl_source/bypass_to_sgxssl.h         |  10 +-
+ 9 files changed, 483 insertions(+), 97 deletions(-)
+ create mode 100644 intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdio.cpp
+ create mode 100644 intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdlib.cpp
+
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
+index 4c5b999..157965d 100755
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
+@@ -133,7 +133,7 @@ cp sgx_config.conf $OPENSSL_VERSION/ || exit 1
+ cp x86_64-xlate.pl $OPENSSL_VERSION/crypto/perlasm/ || exit 1
+ 
+ cd $SGXSSL_ROOT/../openssl_source/$OPENSSL_VERSION || exit 1
+-perl Configure --config=sgx_config.conf sgx-linux-x86_64 --with-rand-seed=none $ADDITIONAL_CONF $SPACE_OPT $MITIGATION_FLAGS no-idea no-mdc2 no-rc5 no-rc4 no-bf no-ec2m no-camellia no-cast no-srp no-hw no-dso no-shared no-ssl3 no-md2 no-md4 no-ui no-stdio no-afalgeng -D_FORTIFY_SOURCE=2 -DGETPID_IS_MEANINGLESS -include$SGXSSL_ROOT/../openssl_source/bypass_to_sgxssl.h --prefix=$OPENSSL_INSTALL_DIR || exit 1
++perl Configure --config=sgx_config.conf sgx-linux-x86_64 --with-rand-seed=none $ADDITIONAL_CONF $SPACE_OPT $MITIGATION_FLAGS no-idea no-mdc2 no-rc5 no-rc4 no-bf no-ec2m no-camellia no-cast no-srp no-hw no-dso no-shared no-ssl3 no-md2 no-md4 no-ui no-afalgeng -D_FORTIFY_SOURCE=2 -DGETPID_IS_MEANINGLESS -include$SGXSSL_ROOT/../openssl_source/bypass_to_sgxssl.h -include$SGXSSL_ROOT/../Linux/package/include/tsgxsslio.h --prefix=$OPENSSL_INSTALL_DIR || exit 1
+ 
+ make build_all_generated || exit 1
+ 
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl
+index 3ad91d8..74dbdde 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl
+@@ -39,6 +39,18 @@ enclave {
+     	 void u_sgxssl_ftime([out, size=timeb_len] void * timeptr, uint32_t timeb_len);
+          int ocall_cc_read(int fd, [out, size = buf_len] void *buf, size_t buf_len);
+          int ocall_cc_write(int fd, [in, size = buf_len] const void *buf, size_t buf_len);
++         int ocall_cc_getenv([in, size = name_len] const char *name, size_t name_len, [out, size = buf_len] void *buf, int buf_len, [out] int *need_len);
++         uint64_t ocall_cc_fopen([in, size = filename_len] const char *filename, size_t filename_len, [in, size = mode_len] const char *mode, size_t mode_len);
++         int ocall_cc_fclose(uint64_t fp);
++         int ocall_cc_ferror(uint64_t fp);
++         int ocall_cc_feof(uint64_t fp);
++         int ocall_cc_fflush(uint64_t fp);
++         long ocall_cc_ftell(uint64_t fp);
++         int ocall_cc_fseek(uint64_t fp, long offset, int origin);
++         size_t ocall_cc_fread([out, size = total_size] void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp);
++         size_t ocall_cc_fwrite([in, size = total_size] const void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp);
++         int ocall_cc_fgets([out, size = max_cnt] char *str, int max_cnt, uint64_t fp);
++         int ocall_cc_fputs([in, size = total_size] const char *str, size_t total_size, uint64_t fp);
+     };
+ 
+     trusted {
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/tsgxsslio.h b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/tsgxsslio.h
+index a200a17..8f9e35b 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/tsgxsslio.h
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/tsgxsslio.h
+@@ -32,6 +32,12 @@
+ #ifndef _TSGXSSL_IO_H_
+ #define _TSGXSSL_IO_H_
+ 
+-typedef void FILE;
++#include <stdio.h>
++
++#undef stdout
++#define stdout ((void*)1)
++#undef stderr
++#define stderr ((void*)2)
++typedef struct _IO_FILE FILE;
+ 
+ #endif // _TSGXSSL_IO_H_
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdio.cpp b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdio.cpp
+index ebb8abb..1e6d8bc 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdio.cpp
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdio.cpp
+@@ -1,55 +1,284 @@
+-/*
+- * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- *   * Redistributions of source code must retain the above copyright
+- *     notice, this list of conditions and the following disclaimer.
+- *   * Redistributions in binary form must reproduce the above copyright
+- *     notice, this list of conditions and the following disclaimer in
+- *     the documentation and/or other materials provided with the
+- *     distribution.
+- *   * Neither the name of Intel Corporation nor the names of its
+- *     contributors may be used to endorse or promote products derived
+- *     from this software without specific prior written permission.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- *
+- */
+-
+-#include <stdio.h>
+-#include "tcommon.h"
+-#include "sgx_tsgxssl_t.h"
+-#include "tSgxSSL_api.h"
+-
+-extern PRINT_TO_STDOUT_STDERR_CB s_print_cb;
+-
+-extern "C" {
+-
+-int sgx_print(const char *format, ...)
+-{
+-	if (s_print_cb != NULL) {
+-		va_list vl;
+-		va_start(vl, format);
+-		int res = s_print_cb(STREAM_STDOUT, format, vl);
+-		va_end(vl);
+-
+-		return res;
+-	}
+-	
+-	return 0;
+-}
+-
+-}
++/*
++ * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include "tcommon.h"
++#include "sgx_tsgxssl_t.h"
++#include "tSgxSSL_api.h"
++#include "tsgxsslio.h"
++
++extern PRINT_TO_STDOUT_STDERR_CB s_print_cb;
++
++extern "C" {
++
++int print_with_cb(void* fp, const char* fmt, __va_list vl)
++{
++    int res = -1;
++
++    if (fp == NULL || s_print_cb == NULL) {
++        return -1;
++    }
++    int stream = -1;
++    if (fp == stdout) {
++        stream = STREAM_STDOUT;
++    } else if (fp == stderr) {
++        stream = STREAM_STDERR;
++    } else {
++        // This function is called only when fp is one of the internally implemented stdout/stderr.
++        return res;
++    } 
++    res = s_print_cb((Stream_t)stream, fmt, vl);
++    return res;
++}
++
++void *sgxssl_fopen(const char *filename, const char *mode)
++{
++    uint64_t ret = 0;
++    int res;
++
++    if (filename == NULL || mode == NULL) {
++        return NULL;
++    }
++
++    res = ocall_cc_fopen(&ret, filename, strlen(filename) + 1, mode, strlen(mode) + 1);
++    if (res != CC_SSL_SUCCESS) {
++        return NULL;
++    }
++    return (void *)ret;
++}
++
++int sgxssl_fclose(void *fp)
++{
++    int ret = -1;
++    int res;
++
++    if (fp == NULL) {
++        return -1;
++    }
++    
++    res = ocall_cc_fclose(&ret, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++        return -1;
++    }
++    return ret;
++}
++
++int sgxssl_ferror(void *fp)
++{
++    int ret = -1;
++    int res;
++
++    if (fp == NULL) {
++        return -1;
++    }
++
++    res = ocall_cc_ferror(&ret, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++	return -1;
++    }
++    return ret;
++}
++
++int sgxssl_feof(void *fp)
++{
++    int ret = 0;
++    int res;
++    
++    if (fp == NULL) {
++	return 0;
++    }
++    
++    res = ocall_cc_feof(&ret, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++	return 0;
++    }
++    return ret;
++}
++
++int sgxssl_fflush(void *fp)
++{
++    int ret = -1;
++    int res;
++
++    if (fp == NULL) {
++        return -1;
++    }
++
++    res = ocall_cc_fflush(&ret, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++        return -1;
++    }
++    return ret;
++}
++
++long sgxssl_ftell(void *fp)
++{
++    long ret = -1;
++    int res;
++
++    if (fp == NULL) {
++	return -1;
++    }
++
++    res = ocall_cc_ftell(&ret, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++        return -1;
++    }
++    return ret;
++}
++
++int sgxssl_fseek(void *fp, long offset, int origin)
++{
++    int ret = -1;
++    int res;
++
++    if (fp == NULL) {
++        return -1;
++    }
++
++    res = ocall_cc_fseek(&ret, (uint64_t)fp, offset, origin);
++    if (res != CC_SSL_SUCCESS) {
++        return -1;
++    }
++    return ret;
++}
++
++
++int sgxssl_fprintf(void *fp, const char *format, ...)
++{
++    if (s_print_cb != NULL) {
++        va_list vl;
++        va_start(vl, format);
++        int res = print_with_cb(fp, format, vl);
++        va_end(vl);
++
++	return res;
++     }
++
++    return -1;
++}
++
++int sgxssl_vfprintf(void *fp, const char *format, va_list vl)
++{
++    if (s_print_cb != NULL) {
++        int res = print_with_cb(fp, format, vl);
++        return res;
++    }
++        
++    return -1;
++}
++
++size_t sgxssl_fread(void *dest, size_t element_size, size_t cnt, void *fp)
++{
++    size_t ret = 0;
++    int res;
++
++    if (fp == NULL || dest == NULL || element_size == 0 || cnt == 0) {
++        return 0;
++    }
++    if (element_size > (SIZE_MAX - 1) / cnt + 1) {
++        return 0;
++    }
++
++    res = ocall_cc_fread(&ret, dest, element_size * cnt, element_size, cnt, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++        return 0;
++    }
++    return ret;
++}
++
++size_t sgxssl_fwrite(const void *src, size_t element_size, size_t cnt, void *fp)
++{
++    size_t ret = 0;
++    int res;
++
++    if (fp == NULL || src == NULL || element_size == 0 || cnt == 0) {
++        return 0;
++    }
++    if (element_size > (SIZE_MAX - 1) / cnt + 1) {
++        return 0;
++    }
++
++    res = ocall_cc_fwrite(&ret, src, element_size * cnt, element_size, cnt, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS) {
++        return 0;
++    }
++    return ret;
++}
++
++char *sgxssl_fgets(char *dest, int max_cnt, void *fp)
++{
++    int ret = -1;
++    int res;
++
++    if (fp == NULL || dest == NULL || max_cnt <= 0) {
++        return NULL;
++    }
++    
++    res = ocall_cc_fgets(&ret, dest, max_cnt, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS || ret < 0) {
++        return NULL;
++    }
++    return dest;
++}
++
++int sgxssl_fputs(const char *src, void *fp)
++{
++    int ret = -1;
++    int res;
++
++    if (fp == NULL || src == NULL) {
++        return -1;
++    }
++
++    res = ocall_cc_fputs(&ret, src, strlen(src) + 1, (uint64_t)fp);
++    if (res != CC_SSL_SUCCESS || ret < 0) {
++        return -1;
++    }
++    return ret;
++}
++
++int sgx_print(const char *format, ...)
++{
++	if (s_print_cb != NULL) {
++		va_list vl;
++		va_start(vl, format);
++		int res = s_print_cb(STREAM_STDOUT, format, vl);
++		va_end(vl);
++
++		return res;
++	}
++	
++	return 0;
++}
++
++}
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdlib.cpp b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdlib.cpp
+index c6a8066..9a66c72 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdlib.cpp
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tstdlib.cpp
+@@ -57,39 +57,25 @@ SGX_ACCESS_VERSION(tssl, 1);
+ 
+ extern "C" {
+ 
++#define MAX_ENV_BUF_LEN 4096
++static __thread char t_env_buf[MAX_ENV_BUF_LEN];
++
+ char *sgxssl_getenv(const char *name)
+ {
+-	FSTART;
+-
+-	if (name == NULL ) {
+-		FEND;
+-		return NULL;
+-	}
+-
+-	if (!strcmp(name, "OPENSSL_CONF" )) {
+-		FEND;
+-		return NULL;
+-	}
+-
+-	if (!strcmp(name, "OPENSSL_ENGINES" )) {
+-		FEND;
+-		return (char *) PATH_DEV_NULL;
+-	}
+-
+-	if (!strcmp(name, "OPENSSL_ALLOW_PROXY_CERTS" )) {
+-		FEND;
+-		return NULL;
+-	}
+-	
+-	if (!strcmp(name, "OPENSSL_ia32cap" )) {
+-		FEND;
+-		return NULL;
+-	}
+-
+-	SGX_UNREACHABLE_CODE(SET_ERRNO);
+-
+-	FEND;
+-	return NULL;
++    int ret = 0;
++    int res;
++    int buf_len = 0;
++    
++    if (t_env_buf == NULL || MAX_ENV_BUF_LEN <= 0) {
++        return NULL;
++    }
++   
++    memset(t_env_buf, 0, MAX_ENV_BUF_LEN);
++    res = ocall_cc_getenv(&ret, name, strlen(name), t_env_buf, MAX_ENV_BUF_LEN, &buf_len);
++    if (res != CC_SSL_SUCCESS || ret <= 0 || ret != buf_len) {
++        return NULL;
++    }
++    return t_env_buf;
+ }
+ 
+ int sgxssl_atexit(void (*function)(void))
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdio.cpp b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdio.cpp
+new file mode 100644
+index 0000000..c4b15f7
+--- /dev/null
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdio.cpp
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#include <stdio.h>
++#include <stdint.h>
++#include <string.h>
++extern "C" {
++
++uint64_t ocall_cc_fopen(const char *filename, size_t filename_len, const char *mode, size_t mode_len)
++{
++    FILE *file_host = fopen(filename, mode);
++    return (uint64_t)file_host;
++}
++
++int ocall_cc_fclose(uint64_t fp)
++{
++    return fclose((FILE *)fp);
++}
++
++int ocall_cc_ferror(uint64_t fp)
++{
++    return ferror((FILE *)fp);
++}
++
++int ocall_cc_feof(uint64_t fp)
++{
++    return feof((FILE *)fp);
++}
++
++int ocall_cc_fflush(uint64_t fp)
++{
++    return fflush((FILE *)fp);
++}
++
++int ocall_cc_ftell(uint64_t fp)
++{
++    return ftell((FILE *)fp);
++}
++
++int ocall_cc_fseek(uint64_t fp, long offset, int origin)
++{
++    return fseek((FILE *)fp, offset, origin);
++}
++
++size_t ocall_cc_fread(void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp)
++{
++    return fread(buf, element_size, cnt, (FILE *)fp);
++}
++
++size_t ocall_cc_fwrite(const void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp)
++{
++    return fwrite(buf, element_size, cnt, (FILE *)fp);
++}
++
++int ocall_cc_fgets(char *str, int max_cnt, uint64_t fp)
++{
++    if (fgets(str, max_cnt, (FILE *)fp) != NULL) {
++        return 0;
++    } else {
++        return -1;
++    }
++}
++
++int ocall_cc_fputs(const char *str, size_t total_size, uint64_t fp)
++{
++    return fputs(str, (FILE *)fp);
++}
++}
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdlib.cpp b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdlib.cpp
+new file mode 100644
+index 0000000..7467e1d
+--- /dev/null
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/ustdlib.cpp
+@@ -0,0 +1,61 @@
++/*
++ * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#include <stdlib.h>
++#include <string.h>
++
++extern "C" {
++
++int ocall_cc_getenv(const char *name, int name_len, void *buf, int buf_len, int *need_len)
++{
++    char *get_buf = NULL;
++    
++    if (name == NULL || need_len == NULL || buf_len <= 0) {
++        return -1;
++    }
++
++    get_buf = getenv(name);
++    if (get_buf == NULL) {
++        *need_len = 0;
++        return 0;
++    }
++    *need_len = strlen(get_buf) + 1;
++    if (*need_len > buf_len) {
++        return 0;
++    }
++    if (buf == NULL) {
++        return -1;
++    }
++    memcpy(buf, get_buf, *need_len);
++    return (*need_len);
++}
++
++}
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/test_app/enclave/tests/stdio_func.c b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/test_app/enclave/tests/stdio_func.c
+index 286340e..13de4dd 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/test_app/enclave/tests/stdio_func.c
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/test_app/enclave/tests/stdio_func.c
+@@ -42,7 +42,7 @@ static int print_fp(const char *str, size_t len, void *fp)
+     printf("%s", str);
+     return 1;
+ }
+-
++/*
+ void ERR_print_errors_fp(FILE *fp)
+ {
+     ERR_print_errors_cb(print_fp, fp);
+@@ -57,4 +57,4 @@ int BN_print_fp(FILE *fp, const BIGNUM *a)
+ 	OPENSSL_free(str);
+     return 1;
+ }
+-
++*/
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/openssl_source/bypass_to_sgxssl.h b/intel-sgx-ssl-lin_2.10_1.1.1g/openssl_source/bypass_to_sgxssl.h
+index 1c4d025..e938ff1 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/openssl_source/bypass_to_sgxssl.h
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/openssl_source/bypass_to_sgxssl.h
+@@ -181,23 +181,19 @@
+ #define mlock sgxssl_mlock
+ #define madvise sgxssl_madvise
+ 
+-/*
+-#define fopen64 sgxssl_fopen64
+ #define fopen sgxssl_fopen
+-#define wfopen sgxssl_wfopen
+ #define fclose sgxssl_fclose
+ #define ferror sgxssl_ferror
+ #define feof sgxssl_feof
+ #define fflush sgxssl_fflush
+ #define ftell sgxssl_ftell
+ #define fseek sgxssl_fseek
+-#define fread sgxssl_fread
+ #define fwrite sgxssl_fwrite
+-#define fgets sgxssl_fgets
+ #define fputs sgxssl_fputs
+-#define fileno sgxssl_fileno
+ #define __fprintf_chk sgxssl_fprintf
+-*/
++#define __vfprintf_chk sgxssl_vfprintf
++#define __fread_alias sgxssl_fread
++#define __fgets_alias sgxssl_fgets
+ 
+ #if defined(SGXSDK_INT_VERSION) && (SGXSDK_INT_VERSION > 18)
+ 	#define _longjmp longjmp
+-- 
+2.27.0
+
