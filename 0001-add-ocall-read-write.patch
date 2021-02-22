@@ -1,0 +1,435 @@
+From 7b20f1fee1c7a437274870c0015435d7f5adcb03 Mon Sep 17 00:00:00 2001
+From: yanlu <yanlu14@huawei.com>
+Date: Mon, 18 Jan 2021 19:24:32 +0800
+Subject: [PATCH] add ocall read write
+
+---
+ intel-sgx-ssl-lin_2.10_1.1.1g/Linux/Makefile  |   1 +
+ .../Linux/build_openssl.sh                    |   5 +-
+ .../Linux/package/include/sgx_tsgxssl.edl     |   2 +
+ .../Linux/sgx/buildenv.mk                     |   2 +
+ .../Linux/sgx/libsgx_tsgxssl/tcommon.h        |   1 +
+ .../Linux/sgx/libsgx_tsgxssl/tunistd.cpp      | 271 +++++++++---------
+ .../Linux/sgx/libsgx_usgxssl/uunistd.cpp      |  46 +++
+ 7 files changed, 185 insertions(+), 143 deletions(-)
+ create mode 100644 intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/uunistd.cpp
+
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/Makefile b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/Makefile
+index b79649e..6b91d1c 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/Makefile
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/Makefile
+@@ -51,6 +51,7 @@ sgxssl_no_mitigation:
+ clean:
+ 	$(MAKE) -C sgx/ clean
+ 	rm -rf $(PACKAGE_LIB)/$(OPENSSL_LIB) $(PACKAGE_INC)/openssl/
++	rm -rf $(PACKAGE_LIB)/$(OPENSSL_SSL_LIB)
+ 	rm -rf $(PACKAGE_LIB)/cve_2020_0551_load
+ 	rm -rf $(PACKAGE_LIB)/cve_2020_0551_cf
+ 
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
+index a70ddf1..4c5b999 100755
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
+@@ -68,8 +68,10 @@ sed -i '/OPENSSL_die("assertion failed/d' $OPENSSL_VERSION/include/openssl/crypt
+ fi
+ 
+ OUTPUT_LIB=libsgx_tsgxssl_crypto.a
++OUTPUT_SSLLIB=libsgx_tsgxssl_ssl.a
+ if [[ $# -gt 0 ]] && [[ $1 == "debug" || $2 == "debug" || $3 == "debug" || $4 == "debug" ]] ; then
+ 	OUTPUT_LIB=libsgx_tsgxssl_cryptod.a
++        OUTPUT_SSLLIB=libsgx_tsgxssl_ssld.a
+     ADDITIONAL_CONF="-g "
+ fi
+ 
+@@ -153,8 +155,9 @@ then
+     cp $SGXSSL_ROOT/../openssl_source/Linux/x86_64cpuid.s       ./crypto/x86_64cpuid.s
+ fi
+ 
+-make libcrypto.a || exit 1
++make libcrypto.a libssl.a || exit 1
+ cp libcrypto.a $SGXSSL_ROOT/package/lib64/$OUTPUT_LIB || exit 1
++cp libssl.a $SGXSSL_ROOT/package/lib64/$OUTPUT_SSLLIB || exit 1
+ objcopy --rename-section .init=Q6A8dc14f40efc4288a03b32cba4e $SGXSSL_ROOT/package/lib64/$OUTPUT_LIB || exit 1
+ cp include/openssl/* $SGXSSL_ROOT/package/include/openssl/ || exit 1
+ exit 0
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl
+index cbc4888..3ad91d8 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/package/include/sgx_tsgxssl.edl
+@@ -37,6 +37,8 @@ enclave {
+     
+     untrusted {
+     	 void u_sgxssl_ftime([out, size=timeb_len] void * timeptr, uint32_t timeb_len);
++         int ocall_cc_read(int fd, [out, size = buf_len] void *buf, size_t buf_len);
++         int ocall_cc_write(int fd, [in, size = buf_len] const void *buf, size_t buf_len);
+     };
+ 
+     trusted {
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/buildenv.mk b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/buildenv.mk
+index cd8818e..7cd794c 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/buildenv.mk
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/buildenv.mk
+@@ -73,11 +73,13 @@ endif
+ ifeq ($(DEBUG), 1)
+ 	OBJDIR := debug
+ 	OPENSSL_LIB := libsgx_tsgxssl_cryptod.a
++	OPENSSL_SSL_LIB := libsgx_tsgxssl_ssld.a
+ 	TRUSTED_LIB := libsgx_tsgxssld.a
+ 	UNTRUSTED_LIB := libsgx_usgxssld.a
+ else
+ 	OBJDIR := release
+ 	OPENSSL_LIB := libsgx_tsgxssl_crypto.a
++	OPENSSL_SSL_LIB := libsgx_tsgxssl_ssl.a
+ 	TRUSTED_LIB := libsgx_tsgxssl.a
+ 	UNTRUSTED_LIB := libsgx_usgxssl.a
+ endif
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tcommon.h b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tcommon.h
+index 4d64d23..7dbbfd1 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tcommon.h
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tcommon.h
+@@ -40,6 +40,7 @@
+ #include "tdefines.h"
+ #include "tSgxSSL_api.h"
+ 
++#define CC_SSL_SUCCESS 0
+ 
+ //#define DO_SGX_LOG
+ #define DO_SGX_WARN
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tunistd.cpp b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tunistd.cpp
+index b6cdd39..d7aba27 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tunistd.cpp
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/tunistd.cpp
+@@ -1,143 +1,130 @@
+-/*
+- * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- *
+- *   * Redistributions of source code must retain the above copyright
+- *     notice, this list of conditions and the following disclaimer.
+- *   * Redistributions in binary form must reproduce the above copyright
+- *     notice, this list of conditions and the following disclaimer in
+- *     the documentation and/or other materials provided with the
+- *     distribution.
+- *   * Neither the name of Intel Corporation nor the names of its
+- *     contributors may be used to endorse or promote products derived
+- *     from this software without specific prior written permission.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- *
+- */
+-
+-#include "sgx_tsgxssl_t.h"
+-#include "tcommon.h"
+-
+-#define FAKE_PIPE_READ_FD	0xFAFAFAFALL
+-#define FAKE_PIPE_WRITE_FD	0xFBFBFBFBLL
+-
+-#define ENCLAVE_PAGE_SIZE	0x1000	// 4096 B
+-
+-extern "C" {
+-
+-int sgxssl_pipe (int pipefd[2])
+-{
+-	FSTART;
+-
+-	// The function is used only by the engines/e_dasync.c (dummy async engine).
+-	// Adding fake implementation only to be able to distinguish pipe read/write from socket read/write
+-	pipefd[0] = FAKE_PIPE_READ_FD;
+-	pipefd[1] = FAKE_PIPE_WRITE_FD;
+-
+-	FEND;
+-
+-	// On error, -1 is returned, and errno is set appropriately
+-	return 0;
+-}
+-
+-size_t sgxssl_write (int fd, const void *buf, size_t n)
+-{
+-	FSTART;
+-
+-	if (fd == FAKE_PIPE_WRITE_FD) {
+-		// With pipes the function is used only by the engines/e_dasync.c (dummy async engine).
+-		SGX_UNSUPPORTED_FUNCTION(SET_ERRNO);
+-
+-		FEND;
+-		// On error, -1 is returned, and errno is set appropriately
+-		return -1;
+-	}
+-
+-	// In addition, the function is used by bss_sock.c as writesocket function.
+-	// It is unreachable under the assumption that TLS support is not required.
+-	// Otherwise should be implemented as OCALL.
+-	SGX_UNREACHABLE_CODE(SET_ERRNO);
+-	FEND;
+-
+-	return -1;
+-
+-}
+-
+-size_t sgxssl_read(int fd, void *buf, size_t count)
+-{
+-	FSTART;
+-
+-	if (fd == FAKE_PIPE_READ_FD) {
+-		// With pipes the function is used only by the engines/e_dasync.c (dummy async engine).
+-		SGX_UNSUPPORTED_FUNCTION(SET_ERRNO);
+-
+-		FEND;
+-		// On error, -1 is returned, and errno is set appropriately
+-		return -1;
+-	}
+-
+-	// In addition, the function is used by bss_sock.c as readsocket function.
+-	// It is unreachable under the assumption that TLS support is not required.
+-	// Otherwise should be implemented as OCALL.
+-	SGX_UNREACHABLE_CODE(SET_ERRNO);
+-	FEND;
+-
+-	return -1;
+-}
+-
+-// TODO
+-int sgxssl_close(int fd)
+-{
+-	FSTART;
+-
+-	if (fd == FAKE_PIPE_READ_FD ||
+-		fd == FAKE_PIPE_WRITE_FD) {
+-		// With pipes the function is used only by the engines/e_dasync.c (dummy async engine).
+-		SGX_UNSUPPORTED_FUNCTION(SET_ERRNO);
+-
+-		FEND;
+-		// On error, -1 is returned, and errno is set appropriately
+-		return -1;
+-	}
+-
+-	// In addition, the function is used by b_sock2.c as closesocket function.
+-	// It is unreachable under the assumption that TLS support is not required.
+-	// Otherwise should be implemented as OCALL.
+-	SGX_UNREACHABLE_CODE(SET_ERRNO);
+-	FEND;
+-
+-	return -1;
+-}
+-
+-long sgxssl_sysconf(int name)
+-{
+-	FSTART;
+-
+-	// Used by mem_sec.c
+-	if (name == _SC_PAGESIZE) {
+-		return ENCLAVE_PAGE_SIZE;
+-	}
+-
+-	SGX_UNREACHABLE_CODE(SET_ERRNO);
+-	FEND;
+-
+-	return -1;
+-}
+-
++/*
++ * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#include "sgx_tsgxssl_t.h"
++#include "tcommon.h"
++
++#define FAKE_PIPE_READ_FD	0xFAFAFAFALL
++#define FAKE_PIPE_WRITE_FD	0xFBFBFBFBLL
++
++#define ENCLAVE_PAGE_SIZE	0x1000	// 4096 B
++
++extern "C" {
++
++int sgxssl_pipe (int pipefd[2])
++{
++	FSTART;
++
++	// The function is used only by the engines/e_dasync.c (dummy async engine).
++	// Adding fake implementation only to be able to distinguish pipe read/write from socket read/write
++	pipefd[0] = FAKE_PIPE_READ_FD;
++	pipefd[1] = FAKE_PIPE_WRITE_FD;
++
++	FEND;
++
++	// On error, -1 is returned, and errno is set appropriately
++	return 0;
++}
++
++size_t sgxssl_write (int fd, const void *buf, size_t n)
++{
++    int ret = 0;
++    int res;
++
++    if (fd == FAKE_PIPE_WRITE_FD) {
++        return -1;
++    }
++    
++    res = ocall_cc_write(&ret, fd, buf, n);
++    if (res != CC_SSL_SUCCESS) {
++        return -1;
++    }
++    return ret;
++}
++
++size_t sgxssl_read(int fd, void *buf, size_t count)
++{
++    int ret = 0;
++    int res;
++    
++    if (fd == FAKE_PIPE_READ_FD) {
++        return -1;
++    }
++
++    res = ocall_cc_read(&ret, fd, buf, count);
++    if (res != CC_SSL_SUCCESS) {
++        return -1;
++    }
++    return ret;
++}
++
++// TODO
++int sgxssl_close(int fd)
++{
++	FSTART;
++
++	if (fd == FAKE_PIPE_READ_FD ||
++		fd == FAKE_PIPE_WRITE_FD) {
++		// With pipes the function is used only by the engines/e_dasync.c (dummy async engine).
++		SGX_UNSUPPORTED_FUNCTION(SET_ERRNO);
++
++		FEND;
++		// On error, -1 is returned, and errno is set appropriately
++		return -1;
++	}
++
++	// In addition, the function is used by b_sock2.c as closesocket function.
++	// It is unreachable under the assumption that TLS support is not required.
++	// Otherwise should be implemented as OCALL.
++	SGX_UNREACHABLE_CODE(SET_ERRNO);
++	FEND;
++
++	return -1;
++}
++
++long sgxssl_sysconf(int name)
++{
++	FSTART;
++
++	// Used by mem_sec.c
++	if (name == _SC_PAGESIZE) {
++		return ENCLAVE_PAGE_SIZE;
++	}
++
++	SGX_UNREACHABLE_CODE(SET_ERRNO);
++	FEND;
++
++	return -1;
++}
++
+ //Process ID is used as RNG entropy, SGXSSL use sgx_get_rand() hence this function is redundant.
+ //
+ int sgxssl_getpid() {
+@@ -198,5 +185,5 @@ void *sgxssl_opendir(const char *name)
+     return NULL;
+ }
+ 
+-
+-} // extern "C"
++
++} // extern "C"
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/uunistd.cpp b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/uunistd.cpp
+new file mode 100644
+index 0000000..c2456ba
+--- /dev/null
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/uunistd.cpp
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2011-2017 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#include <unistd.h>
++
++extern "C" {
++
++int ocall_cc_read(int fd, void *buf, size_t buf_len)
++{
++    return read(fd, buf, buf_len);
++}
++
++int ocall_cc_write(int fd, const void *buf, size_t buf_len)
++{
++    return write(fd, buf, buf_len);
++}
++
++}
+-- 
+2.27.0
+
