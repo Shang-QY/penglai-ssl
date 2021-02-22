@@ -1,10 +1,10 @@
 %define         openssl_version 1.1.1g
 Name:           intel-sgx-ssl
 Version:        2.10
-Release:        4
+Release:        5
 Summary:        Intel® Software Guard Extensions SSL
 ExclusiveArch:	x86_64
-License:        OpenSSL and BSD 3-clause "New" or "Revised" License
+License:        OpenSSL and BSD-3-Clause
 URL:            https://github.com/intel/intel-sgx-ssl
 Source0:        https://github.com/intel/intel-sgx-ssl/archive/lin_%{version}_%{openssl_version}.zip
 Source1:        https://www.openssl.org/source/old/1.1.1/openssl-%{openssl_version}.tar.gz
@@ -62,6 +62,8 @@ cp   License.txt $RPM_BUILD_ROOT/opt/intel/sgxssl/docs/
 /opt/intel/sgxssl/include/*
 
 %changelog
+* Mon Feb 22 2021 chenmaodong <chenmaodong@huawei.com> - 2.10-5
+- add ocall file operation and getenv
 * Tue Jan 26 2021 yanlu <yanlu14@huawei.com> - 2.10-4
 - add ocall file operation and getenv
 * Mon Jan 18 2021 yanlu <yanlu14@huawei.com> - 2.10-3
