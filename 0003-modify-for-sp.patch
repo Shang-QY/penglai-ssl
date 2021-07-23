@@ -1,0 +1,47 @@
+From eddebe3a99d42f0f6b904d32574e30b2ba780847 Mon Sep 17 00:00:00 2001
+From: zgzxx <zhangguangzhi3@huawei.com>
+Date: Sat, 20 Mar 2021 15:45:35 +0800
+Subject: [PATCH] modify for sp
+
+
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/Makefile b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/Makefile
+index 2bf97c8..1501201 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/Makefile
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_tsgxssl/Makefile
+@@ -90,7 +90,7 @@ Sgx_tssl_S_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_S_Files:.S=.o))
+ 
+ Sgx_tssl_Include_Paths := -I. -I$(PACKAGE_INC) -I$(SGX_SDK_INC) -I$(SGX_SDK_INC)/tlibc -I$(LIBCXX_INC)
+ 
+-Common_C_Cpp_Flags := -DOS_ID=$(OS_ID) $(SGX_COMMON_CFLAGS) -nostdinc -fdata-sections -ffunction-sections -Os -Wl,--gc-sections -fvisibility=hidden -fpie -fpic -fstack-protector -fno-builtin-printf -Wformat -Wformat-security $(Sgx_tssl_Include_Paths)
++Common_C_Cpp_Flags := -DOS_ID=$(OS_ID) $(SGX_COMMON_CFLAGS) -nostdinc -fdata-sections -ffunction-sections -Os -Wl,--gc-sections -fvisibility=hidden -fpie -fpic -fstack-protector-strong -fno-builtin-printf -Wformat -Wformat-security $(Sgx_tssl_Include_Paths)
+ Sgx_tssl_C_Flags := $(Common_C_Cpp_Flags) -Wno-implicit-function-declaration -std=c11 $(MITIGATION_CFLAGS)
+ Sgx_tssl_Cpp_Flags := $(Common_C_Cpp_Flags) -std=c++11 -nostdinc++ $(MITIGATION_CFLAGS)
+ $(shell mkdir -p $(OBJDIR))
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/Makefile b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/Makefile
+index 5d7e756..ee1f29f 100644
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/Makefile
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/sgx/libsgx_usgxssl/Makefile
+@@ -72,7 +72,7 @@ SGX_EDL_FILE := $(PACKAGE_INCLUDE)/sgx_tsgxssl.edl
+ 
+ Sgx_ussl_Include_Paths := -I. -I$(SGX_SDK_INC)
+ 
+-Sgx_ussl_C_Flags := $(SGX_COMMON_CFLAGS) -fpie -fpic -fstack-protector -Wformat -Wformat-security -Wno-attributes $(Sgx_ussl_Include_Paths)
++Sgx_ussl_C_Flags := $(SGX_COMMON_CFLAGS) -fpie -fpic -fstack-protector-strong -Wformat -Wformat-security -Wno-attributes $(Sgx_ussl_Include_Paths)
+ Sgx_ussl_Cpp_Flags := $(Sgx_ussl_C_Flags) -std=c++11
+ 
+ Sgx_ussl_Cpp_Files := $(wildcard *.cpp)
+diff --git a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
+index 157965d..472988a 100755
+--- a/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
++++ b/intel-sgx-ssl-lin_2.10_1.1.1g/Linux/build_openssl.sh
+@@ -58,6 +58,7 @@ tar xvf $OPENSSL_VERSION.tar.gz || exit 1
+
+ # Remove AESBS to support only AESNI and VPAES
+ sed -i '/BSAES_ASM/d' $OPENSSL_VERSION/Configure
++sed -i 's/-Wa,--noexecstack/-Wa,--noexecstack -fstack-protector-strong/' $OPENSSL_VERSION/Configure
+
+ ##Space optimization flags.
+ SPACE_OPT=
+-- 
+2.27.0
+
