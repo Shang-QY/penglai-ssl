@@ -68,8 +68,10 @@ sed -i '/OPENSSL_die("assertion failed/d' $OPENSSL_VERSION/include/openssl/crypt
 fi
 
 OUTPUT_LIB=libsgx_tsgxssl_crypto.a
+OUTPUT_SSLLIB=libsgx_tsgxssl_ssl.a
 if [[ $# -gt 0 ]] && [[ $1 == "debug" || $2 == "debug" || $3 == "debug" || $4 == "debug" ]] ; then
 	OUTPUT_LIB=libsgx_tsgxssl_cryptod.a
+        OUTPUT_SSLLIB=libsgx_tsgxssl_ssld.a
     ADDITIONAL_CONF="-g "
 fi
 
@@ -153,8 +155,9 @@ then
     cp $SGXSSL_ROOT/../openssl_source/Linux/x86_64cpuid.s       ./crypto/x86_64cpuid.s
 fi
 
-make libcrypto.a || exit 1
+make libcrypto.a libssl.a || exit 1
 cp libcrypto.a $SGXSSL_ROOT/package/lib64/$OUTPUT_LIB || exit 1
+cp libssl.a $SGXSSL_ROOT/package/lib64/$OUTPUT_SSLLIB || exit 1
 objcopy --rename-section .init=Q6A8dc14f40efc4288a03b32cba4e $SGXSSL_ROOT/package/lib64/$OUTPUT_LIB || exit 1
 cp include/openssl/* $SGXSSL_ROOT/package/include/openssl/ || exit 1
 exit 0

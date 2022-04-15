@@ -51,6 +51,7 @@ sgxssl_no_mitigation:
 clean:
 	$(MAKE) -C sgx/ clean
 	rm -rf $(PACKAGE_LIB)/$(OPENSSL_LIB) $(PACKAGE_INC)/openssl/
+	rm -rf $(PACKAGE_LIB)/$(OPENSSL_SSL_LIB)
 	rm -rf $(PACKAGE_LIB)/cve_2020_0551_load
 	rm -rf $(PACKAGE_LIB)/cve_2020_0551_cf
 

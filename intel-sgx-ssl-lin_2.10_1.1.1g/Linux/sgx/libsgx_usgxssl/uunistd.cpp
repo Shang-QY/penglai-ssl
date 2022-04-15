@@ -29,19 +29,18 @@
  *
  */
 
-/* sgx_tssl.edl - Top EDL file. */
+#include <unistd.h>
 
-enclave {
-    
-    from "sgx_tstdc.edl" import *;
-    
-    untrusted {
-    	 void u_sgxssl_ftime([out, size=timeb_len] void * timeptr, uint32_t timeb_len);
-         int ocall_cc_read(int fd, [out, size = buf_len] void *buf, size_t buf_len);
-         int ocall_cc_write(int fd, [in, size = buf_len] const void *buf, size_t buf_len);
-    };
+extern "C" {
 
-    trusted {
+int ocall_cc_read(int fd, void *buf, size_t buf_len)
+{
+    return read(fd, buf, buf_len);
+}
 
-    };
-};
+int ocall_cc_write(int fd, const void *buf, size_t buf_len)
+{
+    return write(fd, buf, buf_len);
+}
+
+}

@@ -73,11 +73,13 @@ endif
 ifeq ($(DEBUG), 1)
 	OBJDIR := debug
 	OPENSSL_LIB := libsgx_tsgxssl_cryptod.a
+	OPENSSL_SSL_LIB := libsgx_tsgxssl_ssld.a
 	TRUSTED_LIB := libsgx_tsgxssld.a
 	UNTRUSTED_LIB := libsgx_usgxssld.a
 else
 	OBJDIR := release
 	OPENSSL_LIB := libsgx_tsgxssl_crypto.a
+	OPENSSL_SSL_LIB := libsgx_tsgxssl_ssl.a
 	TRUSTED_LIB := libsgx_tsgxssl.a
 	UNTRUSTED_LIB := libsgx_usgxssl.a
 endif
