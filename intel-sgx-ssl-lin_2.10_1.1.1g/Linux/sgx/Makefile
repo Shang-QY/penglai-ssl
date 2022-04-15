@@ -45,12 +45,12 @@ ifeq ($(DEBUG), 1)
 endif
 
 all: $(PACKAGE_LIB)/$(OPENSSL_LIB)
-	$(MAKE) -C $(TRUSTED_LIB_DIR) all
-	$(MAKE) -C $(UNTRUSTED_LIB_DIR) all
+# $(MAKE) -C $(TRUSTED_LIB_DIR) all
+# $(MAKE) -C $(UNTRUSTED_LIB_DIR) all
 
-ifeq ($(LINUX_SGX_BUILD), 0)
-	$(MAKE) -C $(TEST_DIR) all
-endif
+# ifeq ($(LINUX_SGX_BUILD), 0)
+# 	$(MAKE) -C $(TEST_DIR) all
+# endif
 
 ifneq ($(MITIGATION-CVE-2020-0551),)
 	$(RM) -r $(PACKAGE_LIB)$(MITIGATION_LIB_PATH)/$(TRUSTED_LIB)
