@@ -29,32 +29,33 @@
  *
  */
 
+#include <stdlib.h>
+#include <string.h>
 
-#include <stdio.h>
-#include <openssl/bn.h>
-#include <openssl/crypto.h>
-#include <openssl/buffer.h>
-#include <openssl/err.h>
+extern "C" {
 
-extern void printf(const char *fmt, ...);
-static int print_fp(const char *str, size_t len, void *fp)
+int ocall_cc_getenv(const char *name, int name_len, void *buf, int buf_len, int *need_len)
 {
-    printf("%s", str);
-    return 1;
-}
-/*
-void ERR_print_errors_fp(FILE *fp)
-{
-    ERR_print_errors_cb(print_fp, fp);
+    char *get_buf = NULL;
+    
+    if (name == NULL || need_len == NULL || buf_len <= 0) {
+        return -1;
+    }
+
+    get_buf = getenv(name);
+    if (get_buf == NULL) {
+        *need_len = 0;
+        return 0;
+    }
+    *need_len = strlen(get_buf) + 1;
+    if (*need_len > buf_len) {
+        return 0;
+    }
+    if (buf == NULL) {
+        return -1;
+    }
+    memcpy(buf, get_buf, *need_len);
+    return (*need_len);
 }
 
-int BN_print_fp(FILE *fp, const BIGNUM *a)
-{
-    char* str = BN_bn2hex(a);
-    if (str == NULL)
-		return 0;
-	printf("%s", str);
-	OPENSSL_free(str);
-    return 1;
 }
-*/

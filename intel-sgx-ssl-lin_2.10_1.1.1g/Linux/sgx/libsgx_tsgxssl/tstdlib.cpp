@@ -57,39 +57,25 @@ SGX_ACCESS_VERSION(tssl, 1);
 
 extern "C" {
 
+#define MAX_ENV_BUF_LEN 4096
+static __thread char t_env_buf[MAX_ENV_BUF_LEN];
+
 char *sgxssl_getenv(const char *name)
 {
-	FSTART;
-
-	if (name == NULL ) {
-		FEND;
-		return NULL;
-	}
-
-	if (!strcmp(name, "OPENSSL_CONF" )) {
-		FEND;
-		return NULL;
-	}
-
-	if (!strcmp(name, "OPENSSL_ENGINES" )) {
-		FEND;
-		return (char *) PATH_DEV_NULL;
-	}
-
-	if (!strcmp(name, "OPENSSL_ALLOW_PROXY_CERTS" )) {
-		FEND;
-		return NULL;
-	}
-	
-	if (!strcmp(name, "OPENSSL_ia32cap" )) {
-		FEND;
-		return NULL;
-	}
-
-	SGX_UNREACHABLE_CODE(SET_ERRNO);
-
-	FEND;
-	return NULL;
+    int ret = 0;
+    int res;
+    int buf_len = 0;
+    
+    if (t_env_buf == NULL || MAX_ENV_BUF_LEN <= 0) {
+        return NULL;
+    }
+   
+    memset(t_env_buf, 0, MAX_ENV_BUF_LEN);
+    res = ocall_cc_getenv(&ret, name, strlen(name), t_env_buf, MAX_ENV_BUF_LEN, &buf_len);
+    if (res != CC_SSL_SUCCESS || ret <= 0 || ret != buf_len) {
+        return NULL;
+    }
+    return t_env_buf;
 }
 
 int sgxssl_atexit(void (*function)(void))

@@ -29,32 +29,68 @@
  *
  */
 
-
 #include <stdio.h>
-#include <openssl/bn.h>
-#include <openssl/crypto.h>
-#include <openssl/buffer.h>
-#include <openssl/err.h>
+#include <stdint.h>
+#include <string.h>
+extern "C" {
 
-extern void printf(const char *fmt, ...);
-static int print_fp(const char *str, size_t len, void *fp)
+uint64_t ocall_cc_fopen(const char *filename, size_t filename_len, const char *mode, size_t mode_len)
 {
-    printf("%s", str);
-    return 1;
-}
-/*
-void ERR_print_errors_fp(FILE *fp)
-{
-    ERR_print_errors_cb(print_fp, fp);
+    FILE *file_host = fopen(filename, mode);
+    return (uint64_t)file_host;
 }
 
-int BN_print_fp(FILE *fp, const BIGNUM *a)
+int ocall_cc_fclose(uint64_t fp)
 {
-    char* str = BN_bn2hex(a);
-    if (str == NULL)
-		return 0;
-	printf("%s", str);
-	OPENSSL_free(str);
-    return 1;
+    return fclose((FILE *)fp);
 }
-*/
+
+int ocall_cc_ferror(uint64_t fp)
+{
+    return ferror((FILE *)fp);
+}
+
+int ocall_cc_feof(uint64_t fp)
+{
+    return feof((FILE *)fp);
+}
+
+int ocall_cc_fflush(uint64_t fp)
+{
+    return fflush((FILE *)fp);
+}
+
+int ocall_cc_ftell(uint64_t fp)
+{
+    return ftell((FILE *)fp);
+}
+
+int ocall_cc_fseek(uint64_t fp, long offset, int origin)
+{
+    return fseek((FILE *)fp, offset, origin);
+}
+
+size_t ocall_cc_fread(void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp)
+{
+    return fread(buf, element_size, cnt, (FILE *)fp);
+}
+
+size_t ocall_cc_fwrite(const void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp)
+{
+    return fwrite(buf, element_size, cnt, (FILE *)fp);
+}
+
+int ocall_cc_fgets(char *str, int max_cnt, uint64_t fp)
+{
+    if (fgets(str, max_cnt, (FILE *)fp) != NULL) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
+int ocall_cc_fputs(const char *str, size_t total_size, uint64_t fp)
+{
+    return fputs(str, (FILE *)fp);
+}
+}

@@ -181,23 +181,19 @@
 #define mlock sgxssl_mlock
 #define madvise sgxssl_madvise
 
-/*
-#define fopen64 sgxssl_fopen64
 #define fopen sgxssl_fopen
-#define wfopen sgxssl_wfopen
 #define fclose sgxssl_fclose
 #define ferror sgxssl_ferror
 #define feof sgxssl_feof
 #define fflush sgxssl_fflush
 #define ftell sgxssl_ftell
 #define fseek sgxssl_fseek
-#define fread sgxssl_fread
 #define fwrite sgxssl_fwrite
-#define fgets sgxssl_fgets
 #define fputs sgxssl_fputs
-#define fileno sgxssl_fileno
 #define __fprintf_chk sgxssl_fprintf
-*/
+#define __vfprintf_chk sgxssl_vfprintf
+#define __fread_alias sgxssl_fread
+#define __fgets_alias sgxssl_fgets
 
 #if defined(SGXSDK_INT_VERSION) && (SGXSDK_INT_VERSION > 18)
 	#define _longjmp longjmp
