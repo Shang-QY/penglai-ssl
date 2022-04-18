@@ -133,7 +133,7 @@ cp sgx_config.conf $OPENSSL_VERSION/ || exit 1
 cp x86_64-xlate.pl $OPENSSL_VERSION/crypto/perlasm/ || exit 1
 
 cd $SGXSSL_ROOT/../openssl_source/$OPENSSL_VERSION || exit 1
-perl Configure --config=sgx_config.conf penglai-linux-riscv64 CC=gcc --cross-compile-prefix=riscv64-unknown-linux-gnu- --with-rand-seed=none no-threads no-asm $ADDITIONAL_CONF $SPACE_OPT $MITIGATION_FLAGS no-idea no-mdc2 no-rc5 no-rc4 no-bf no-ec2m no-camellia no-cast no-srp no-hw no-dso no-shared no-ssl3 no-md2 no-md4 no-ui no-afalgeng -DGETPID_IS_MEANINGLESS -include$SGXSSL_ROOT/../openssl_source/bypass_to_sgxssl.h -include$SGXSSL_ROOT/../Linux/package/include/tsgxsslio.h --prefix=$OPENSSL_INSTALL_DIR || exit 1
+perl Configure --config=sgx_config.conf penglai-linux-riscv64 CC=gcc --cross-compile-prefix=riscv64-unknown-linux-gnu- --with-rand-seed=none no-threads no-asm -DOPENSSL_NO_SECURE_MEMORY $ADDITIONAL_CONF $SPACE_OPT $MITIGATION_FLAGS no-idea no-mdc2 no-rc5 no-rc4 no-bf no-ec2m no-camellia no-cast no-srp no-hw no-dso no-shared no-ssl3 no-md2 no-md4 no-ui no-afalgeng -DGETPID_IS_MEANINGLESS -include$SGXSSL_ROOT/../openssl_source/bypass_to_sgxssl.h -include$SGXSSL_ROOT/../Linux/package/include/tsgxsslio.h --prefix=$OPENSSL_INSTALL_DIR || exit 1
 
 make build_all_generated || exit 1
 

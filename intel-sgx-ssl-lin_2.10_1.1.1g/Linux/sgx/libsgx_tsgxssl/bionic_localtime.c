@@ -39,8 +39,11 @@
 * 2016 This file was modified to fit the specific needs of Intel® Software Guard Extensions SSL 
 */
 
+#include <stdlib.h>
+#include "tdefines.h"
 #include "sgx_tsgxssl_t.h"
-#include "tcommon.h"
+
+typedef long int time_t;
 
 #define FALSE	0
 #define TRUE	1

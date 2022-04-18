@@ -29,7 +29,6 @@
  *
  */
 
-#include "sgx_tsgxssl_t.h"
 #include "tcommon.h"
 
 #define FAKE_PIPE_READ_FD	0xFAFAFAFALL
@@ -113,11 +112,6 @@ int sgxssl_close(int fd)
 long sgxssl_sysconf(int name)
 {
 	FSTART;
-
-	// Used by mem_sec.c
-	if (name == _SC_PAGESIZE) {
-		return ENCLAVE_PAGE_SIZE;
-	}
 
 	SGX_UNREACHABLE_CODE(SET_ERRNO);
 	FEND;

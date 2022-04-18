@@ -29,7 +29,6 @@
  *
  */
 
-#include "sgx_tsgxssl_t.h"
 #include "tcommon.h"
 
 extern "C" {

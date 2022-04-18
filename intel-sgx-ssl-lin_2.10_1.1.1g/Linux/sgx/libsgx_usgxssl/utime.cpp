@@ -30,7 +30,7 @@
  */
 
 #include <sys/timeb.h>
-
+#include <stdio.h>
 #include "ucommon.h"
 
 
@@ -55,6 +55,7 @@ extern "C" {
 
 void u_sgxssl_ftime(void * timeptr, uint32_t timeb_len)
 {
+    printf("Enter ocall: %s()\n", __func__);
 	SGX_ASSERT_STRUCT_SIZE(struct timeb, timeb_len);
 
 	ftime((struct timeb *) timeptr);

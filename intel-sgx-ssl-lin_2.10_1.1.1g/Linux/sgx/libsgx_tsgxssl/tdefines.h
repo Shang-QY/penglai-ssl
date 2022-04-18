@@ -35,8 +35,6 @@
 #define TRUE	1
 #define FALSE	0
 
-typedef unsigned int socklen_t;
-
 typedef long int time_t;
 
 struct tm
@@ -57,17 +55,6 @@ struct tm
 
 typedef long int suseconds_t;
 
-struct timeval
-{
-    time_t tv_sec;			// seconds
-    suseconds_t tv_usec;	// microseconds
-};
-
-struct timespec {
-    time_t   tv_sec;        /* seconds */
-    long     tv_nsec;       /* nanoseconds */
-};
-
 struct timeb
 {
    time_t         time;
@@ -81,32 +68,6 @@ struct timezone
   int tz_minuteswest;     /* minutes west of Greenwich */
   int tz_dsttime;         /* type of DST correction */
 };
-
-typedef void pthread_rwlock_t;
-
-typedef void pthread_rwlockattr_t;
-#define CLOCK_REALTIME 0
-
-// Values for the argument to `sysconf'. Only _SC_PAGESIZE is actually used.
-#define _UNISTD_H
-#define Ubuntu 1
-#define CentOS 2
-#define NixPKG 3
-
-#ifndef OS_ID
-	#error No OS ID defined.	
-#endif
-#if OS_ID == Ubuntu
-	#include "/usr/include/x86_64-linux-gnu/bits/confname.h"
-#elif OS_ID == CentOS
-	#include "/usr/include/bits/confname.h"
-#elif OS_ID == NixPKG
-	#include "bits/confname.h"
-#else
-	#error Invalid OS ID
-#endif
-#undef _UNISTD_H
-
 
 typedef int pthread_once_t;
 typedef unsigned int pthread_key_t;

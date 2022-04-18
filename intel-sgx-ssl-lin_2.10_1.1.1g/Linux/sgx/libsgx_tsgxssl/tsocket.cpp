@@ -30,13 +30,12 @@
  */
 
 #include <string.h>
-
-#include "sgx_tsgxssl_t.h"
 #include "tcommon.h"
 
 
 extern "C" {
 
+typedef unsigned int socklen_t;
 
 int sgxssl_getsockname(int sockfd, void *addr, socklen_t *addrlen)
 {
@@ -206,7 +205,7 @@ int sgxssl_ioctl (int fd, unsigned long int request, ...)
 	SGX_UNREACHABLE_CODE(SET_ERRNO);
 	FEND;
 
-	return NULL;
+	return -1;
 }
 
 char * sgxssl_gai_strerror(int err)

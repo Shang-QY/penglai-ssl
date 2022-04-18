@@ -29,11 +29,17 @@
  *
  */
 
-#include "sgx_tsgxssl_t.h"
 #include "tcommon.h"
 #include <assert.h>
 
-extern sgx_status_t SGX_CDECL u_sgxssl_ftime(void* timeptr, uint32_t timeb_len) __attribute__((weak));
+#define CLOCK_REALTIME 0
+struct timeb
+{
+   time_t         time;
+   unsigned short millitm;
+   short          timezone;
+   short          dstflag;
+};
 
 extern "C" {
 
@@ -44,10 +50,8 @@ time_t sgxssl_time (time_t *timer)
 
 	struct timeb timeptr;
 	
-	assert(NULL != u_sgxssl_ftime && "u_sgxssl_ftime is NULL...");
-	
-	sgx_status_t sgx_ret = u_sgxssl_ftime(&timeptr, sizeof(struct timeb));
-	if (sgx_ret != SGX_SUCCESS)
+	cc_enclave_result_t sgx_ret = u_sgxssl_ftime(&timeptr, sizeof(struct timeb));
+	if (sgx_ret != CC_SUCCESS)
 	{
 		errno = EFAULT;
 		timeptr.time = (time_t)-1;
@@ -74,11 +78,9 @@ int sgxssl_gettimeofday(struct timeval *tv, struct timezone *tz)
 	}
 
 	struct timeb timeptr;
-
-	assert(NULL != u_sgxssl_ftime && "u_sgxssl_ftime is NULL...");
 	
-	sgx_status_t sgx_ret = u_sgxssl_ftime(&timeptr, sizeof(struct timeb));
-	if (sgx_ret != SGX_SUCCESS)
+	cc_enclave_result_t sgx_ret = u_sgxssl_ftime(&timeptr, sizeof(struct timeb));
+	if (sgx_ret != CC_SUCCESS)
 	{
 		errno = EFAULT;
 		FEND;

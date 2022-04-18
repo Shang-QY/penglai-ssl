@@ -29,7 +29,6 @@
  *
  */
 
-#include "sgx_tsgxssl_t.h"
 #include "tcommon.h"
 
 extern "C" {
@@ -41,15 +40,16 @@ int sgxssl_read_rand(unsigned char *rand_buf, int length_in_bytes)
 {
 	FSTART;
 
-	sgx_status_t ret;
+	int ret;
 
 	if (rand_buf == NULL ||	length_in_bytes <= 0) {
 		FEND;
 		return 1;
 	}
 
-	ret = sgx_read_rand(rand_buf, length_in_bytes);
-	if (ret != SGX_SUCCESS) {
+    // penglai_read_rand()
+	ret = 0;
+	if (ret != 0) {
 		FEND;
 		return 1;
 	}

@@ -29,6 +29,7 @@
  *
  */
  
+#include <stdlib.h>
 #include "sgx_tsgxssl_t.h"
 
 // Following enum is copied from /usr/include/ctype.h.

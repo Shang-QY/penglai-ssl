@@ -34,54 +34,72 @@
 #include <string.h>
 extern "C" {
 
+// [in, size=32]char *buf
+int ocall_printf(char *buf)
+{
+    printf("Enter ocall: %s()\n", __func__);
+    printf("%s\n",buf);
+    return 0;
+}
+
 uint64_t ocall_cc_fopen(const char *filename, size_t filename_len, const char *mode, size_t mode_len)
 {
+    printf("Enter ocall: %s()\n", __func__);
     FILE *file_host = fopen(filename, mode);
     return (uint64_t)file_host;
 }
 
 int ocall_cc_fclose(uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return fclose((FILE *)fp);
 }
 
 int ocall_cc_ferror(uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return ferror((FILE *)fp);
 }
 
 int ocall_cc_feof(uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return feof((FILE *)fp);
 }
 
 int ocall_cc_fflush(uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return fflush((FILE *)fp);
 }
 
 int ocall_cc_ftell(uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return ftell((FILE *)fp);
 }
 
 int ocall_cc_fseek(uint64_t fp, long offset, int origin)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return fseek((FILE *)fp, offset, origin);
 }
 
 size_t ocall_cc_fread(void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return fread(buf, element_size, cnt, (FILE *)fp);
 }
 
 size_t ocall_cc_fwrite(const void *buf, size_t total_size, size_t element_size, size_t cnt, uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return fwrite(buf, element_size, cnt, (FILE *)fp);
 }
 
 int ocall_cc_fgets(char *str, int max_cnt, uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     if (fgets(str, max_cnt, (FILE *)fp) != NULL) {
         return 0;
     } else {
@@ -91,6 +109,7 @@ int ocall_cc_fgets(char *str, int max_cnt, uint64_t fp)
 
 int ocall_cc_fputs(const char *str, size_t total_size, uint64_t fp)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return fputs(str, (FILE *)fp);
 }
 }

@@ -41,42 +41,13 @@ else ifeq ($(findstring -m32, $(CXXFLAGS)), -m32)
 	SGX_ARCH := x86
 endif
 
-ifeq ($(SGX_ARCH), x86)
-	$(error x86 build is not supported, only x64!!)
-else
-	SGX_COMMON_CFLAGS := -m64 -Wall
-	ifeq ($(LINUX_SGX_BUILD), 1)
-		include ../../../../../buildenv.mk
-		SGX_EDGER8R := $(BUILD_DIR)/sgx_edger8r
-		SGX_SDK_INC := $(COMMON_DIR)/inc
-		LIBCXX_INC := $(LINUX_SDK_DIR)/tlibcxx/include
-	else
-		SGX_EDGER8R := $(SGX_SDK)/bin/x64/sgx_edger8r
-		SGX_SDK_INC := $(SGX_SDK)/include
-		LIBCXX_INC := $(SGX_SDK)/include/libcxx
-	endif
-endif
+SGX_COMMON_CFLAGS := -Wall
 
-ifeq ($(DEBUG), 1)
-ifeq ($(SGX_PRERELEASE), 1)
-$(error Cannot set DEBUG and SGX_PRERELEASE at the same time!!)
-endif
-endif
-
-ifeq ($(DEBUG), 1)
-	SGX_COMMON_CFLAGS += -O0 -g
-else
-	SGX_COMMON_CFLAGS += -O2 -D_FORTIFY_SOURCE=2
-endif
-
-
-ifeq ($(SGX_MODE), HW)
-ifndef DEBUG
-ifneq ($(SGX_PRERELEASE), 1)
-Build_Mode = HW_RELEASE
-endif
-endif
-endif
+# please set penglai_sdk path
+PENGLAI_SDK_DIR := /root/dev/sdk
+PENGLAI_SDK_INCLUDE_DIR := ${PENGLAI_SDK_DIR}/lib/app/include
+SECGEAR_DIR := /root/dev/secGear
+SECGEAR_INCLUDE_DIR := $(SECGEAR_DIR)/inc
 
 SGX_EDL_FILE := $(PACKAGE_INC)/sgx_tsgxssl.edl
 
@@ -88,10 +59,14 @@ Sgx_tssl_Cpp_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_Cpp_Files:.cpp=.o))
 Sgx_tssl_C_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_C_Files:.c=.o))
 Sgx_tssl_S_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_S_Files:.S=.o))
 
-Sgx_tssl_Include_Paths := -I. -I$(PACKAGE_INC) -I$(SGX_SDK_INC) -I$(SGX_SDK_INC)/tlibc -I$(LIBCXX_INC)
+Sgx_tssl_Include_Paths := -I. -I$(PACKAGE_INC) -I $(PENGLAI_SDK_INCLUDE_DIR) \
+	-I $(SECGEAR_INCLUDE_DIR)/host_inc	\
+	-I $(SECGEAR_INCLUDE_DIR)/host_inc/penglai	\
+	-I $(SECGEAR_INCLUDE_DIR)/enclave_inc	\
+    -I $(SECGEAR_INCLUDE_DIR)/enclave_inc/penglai
 
-Common_C_Cpp_Flags := -DOS_ID=$(OS_ID) $(SGX_COMMON_CFLAGS) -nostdinc -fdata-sections -ffunction-sections -Os -Wl,--gc-sections -fvisibility=hidden -fpie -fpic -fstack-protector -fno-builtin-printf -Wformat -Wformat-security $(Sgx_tssl_Include_Paths)
-Sgx_tssl_C_Flags := $(Common_C_Cpp_Flags) -Wno-implicit-function-declaration -std=c11 $(MITIGATION_CFLAGS)
+Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) -fdata-sections -ffunction-sections -Os -Wl,--gc-sections -fvisibility=hidden -fpie -fpic -fstack-protector -fno-builtin-printf -Wformat -Wformat-security $(Sgx_tssl_Include_Paths)
+Sgx_tssl_C_Flags := $(Common_C_Cpp_Flags) $(MITIGATION_CFLAGS)
 Sgx_tssl_Cpp_Flags := $(Common_C_Cpp_Flags) -std=c++11 -nostdinc++ $(MITIGATION_CFLAGS)
 $(shell mkdir -p $(OBJDIR))
 
@@ -100,8 +75,8 @@ $(shell mkdir -p $(OBJDIR))
 all: $(TRUSTED_LIB)
 
 ######## sgx_tsgxssl Objects ########
-sgx_tsgxssl_t.c: $(SGX_EDGER8R) $(SGX_EDL_FILE)
-	$(SGX_EDGER8R) --header-only --trusted $(SGX_EDL_FILE) --search-path $(SGX_SDK_INC)
+sgx_tsgxssl_t.c: $(SGX_EDL_FILE)
+	codegen --penglai --header-only --trusted $(SGX_EDL_FILE)
 	@echo "GEN  =>  $@"
 
 sgx_tsgxssl_t.o: sgx_tsgxssl_t.c

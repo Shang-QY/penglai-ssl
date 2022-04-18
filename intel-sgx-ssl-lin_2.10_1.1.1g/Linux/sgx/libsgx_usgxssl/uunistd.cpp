@@ -30,16 +30,18 @@
  */
 
 #include <unistd.h>
-
+#include <stdio.h>
 extern "C" {
 
 int ocall_cc_read(int fd, void *buf, size_t buf_len)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return read(fd, buf, buf_len);
 }
 
 int ocall_cc_write(int fd, const void *buf, size_t buf_len)
 {
+    printf("Enter ocall: %s()\n", __func__);
     return write(fd, buf, buf_len);
 }
 

@@ -43,7 +43,7 @@ endif
 ifeq ($(SGX_ARCH), x86)
 	$(error x86 build is not supported, only x64!!)
 else
-	SGX_COMMON_CFLAGS := -m64 -Wall
+	SGX_COMMON_CFLAGS := -Wall
 	ifeq ($(LINUX_SGX_BUILD), 1)
 		include ../../../../../buildenv.mk
 		SGX_EDGER8R := $(BUILD_DIR)/sgx_edger8r
@@ -70,7 +70,7 @@ SGX_EDL_FILE := $(PACKAGE_INCLUDE)/sgx_tsgxssl.edl
 
 ######## App Settings ########
 
-Sgx_ussl_Include_Paths := -I. -I$(SGX_SDK_INC)
+Sgx_ussl_Include_Paths := -I.
 
 Sgx_ussl_C_Flags := $(SGX_COMMON_CFLAGS) -fpie -fpic -fstack-protector -Wformat -Wformat-security -Wno-attributes $(Sgx_ussl_Include_Paths)
 Sgx_ussl_Cpp_Flags := $(Sgx_ussl_C_Flags) -std=c++11

@@ -33,16 +33,14 @@
 #define __TCOMMON_H__
 
 #include <stdlib.h>
-#include <sgx_trts.h>
 #include "sgx_tsgxssl_t.h"
 #include "errno.h"
 
-#include "tdefines.h"
 #include "tSgxSSL_api.h"
 
 #define CC_SSL_SUCCESS 0
 
-//#define DO_SGX_LOG
+#define DO_SGX_LOG
 #define DO_SGX_WARN
 
 #define SGX_ERROR(...) sgx_print("TERROR: " __VA_ARGS__);

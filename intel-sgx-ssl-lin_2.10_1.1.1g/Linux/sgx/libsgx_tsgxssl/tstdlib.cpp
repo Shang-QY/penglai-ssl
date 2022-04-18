@@ -30,8 +30,6 @@
  */
 
 #include <string.h>
-
-#include "sgx_tsgxssl_t.h"
 #include "tcommon.h"
 #include "tSgxSSL_api.h"
 

@@ -37,7 +37,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#pragma warning( disable: 4100 )
+// #pragma warning( disable: 4100 )
 
 #define SGX_BUFSIZ 512
 

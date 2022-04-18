@@ -38,10 +38,12 @@
 
 #include <sys/types.h>
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <ctype.h>
 
 #define	BUF		513	/* Maximum length of numeric string. */
 
@@ -94,7 +96,7 @@ static u_char *__sccl(char *, u_char *);
  * vsscanf
  */
 int
-sgxssl_vsscanf(const char* str_buf, int str_cnt, const char *fmt0, __va_list ap)
+sgxssl_vsscanf(const char* str_buf, int str_cnt, const char *fmt0, va_list ap)
 {
 	u_char *fmt = (u_char *)fmt0;
 	int c;		/* character from format, or conversion */
@@ -378,7 +380,7 @@ literal:
 			/* take only those things in the class */
 			if (flags & SUPPRESS) {
 				n = 0;
-				while (ccltab[*str_buf]) {
+				while (ccltab[(int)(*str_buf)]) {
 					n++, str_cnt--, str_buf++;
 					if (--width == 0)
 						break;
@@ -392,7 +394,7 @@ literal:
 					goto match_failure;
 			} else {
 				p0 = p = va_arg(ap, char *);
-				while (ccltab[*str_buf]) {
+				while (ccltab[(int)(*str_buf)]) {
 					str_cnt--;
 					*p++ = *str_buf++;
 					if (--width == 0)
@@ -714,8 +716,7 @@ match_failure:
  * closing `]'.  The table has a 1 wherever characters should be
  * considered part of the scanset.
  */
-static u_char *
-__sccl(char *tab, u_char *fmt)
+static u_char *__sccl(char *tab, u_char *fmt)
 {
 	int c, n, v;
 

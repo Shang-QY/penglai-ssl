@@ -31,11 +31,13 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 extern "C" {
 
 int ocall_cc_getenv(const char *name, int name_len, void *buf, int buf_len, int *need_len)
 {
+    printf("Enter ocall: %s()\n", __func__);
     char *get_buf = NULL;
     
     if (name == NULL || need_len == NULL || buf_len <= 0) {
