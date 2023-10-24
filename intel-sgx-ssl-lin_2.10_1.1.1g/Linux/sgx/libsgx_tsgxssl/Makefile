@@ -41,11 +41,12 @@ else ifeq ($(findstring -m32, $(CXXFLAGS)), -m32)
 	SGX_ARCH := x86
 endif
 
-SGX_COMMON_CFLAGS := -Wall
+SGX_COMMON_CFLAGS := -Wall -shared -fPIC
 
 # please set penglai_sdk path
 PENGLAI_SDK_DIR := /root/dev/sdk
 PENGLAI_SDK_INCLUDE_DIR := ${PENGLAI_SDK_DIR}/lib/app/include
+PENGLAI_GM_INCLUDE_DIR := ${PENGLAI_SDK_DIR}/lib/gm/include
 SECGEAR_DIR := /root/dev/secGear
 SECGEAR_INCLUDE_DIR := $(SECGEAR_DIR)/inc
 
@@ -59,13 +60,13 @@ Sgx_tssl_Cpp_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_Cpp_Files:.cpp=.o))
 Sgx_tssl_C_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_C_Files:.c=.o))
 Sgx_tssl_S_Objects := $(addprefix $(OBJDIR)/, $(Sgx_tssl_S_Files:.S=.o))
 
-Sgx_tssl_Include_Paths := -I. -I$(PACKAGE_INC) -I $(PENGLAI_SDK_INCLUDE_DIR) \
+Sgx_tssl_Include_Paths := -I. -I$(PACKAGE_INC) -I $(PENGLAI_SDK_INCLUDE_DIR) -I $(PENGLAI_GM_INCLUDE_DIR) \
 	-I $(SECGEAR_INCLUDE_DIR)/host_inc	\
 	-I $(SECGEAR_INCLUDE_DIR)/host_inc/penglai	\
 	-I $(SECGEAR_INCLUDE_DIR)/enclave_inc	\
     -I $(SECGEAR_INCLUDE_DIR)/enclave_inc/penglai
 
-Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) -fdata-sections -ffunction-sections -Os -Wl,--gc-sections -fvisibility=hidden -fpie -fpic -fstack-protector -fno-builtin-printf -Wformat -Wformat-security $(Sgx_tssl_Include_Paths)
+Common_C_Cpp_Flags := $(SGX_COMMON_CFLAGS) $(Sgx_tssl_Include_Paths)
 Sgx_tssl_C_Flags := $(Common_C_Cpp_Flags) $(MITIGATION_CFLAGS)
 Sgx_tssl_Cpp_Flags := $(Common_C_Cpp_Flags) -std=c++11 -nostdinc++ $(MITIGATION_CFLAGS)
 $(shell mkdir -p $(OBJDIR))

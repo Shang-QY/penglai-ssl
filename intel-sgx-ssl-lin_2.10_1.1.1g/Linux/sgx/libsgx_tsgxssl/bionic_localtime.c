@@ -41,7 +41,7 @@
 
 #include <stdlib.h>
 #include "tdefines.h"
-#include "sgx_tsgxssl_t.h"
+#include "tcommon.h"
 
 typedef long int time_t;
 
@@ -235,5 +235,7 @@ struct tm* sgxssl_gmtime_r(const time_t* timep, struct tm *result)
 
 struct tm* sgxssl_gmtime(const time_t* timep)
 {
-	return sgxssl_gmtime_r(timep, NULL);
+	FSTART;
+    FEND;
+    return sgxssl_gmtime_r(timep, NULL);
 }

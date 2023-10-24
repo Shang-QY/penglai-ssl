@@ -181,6 +181,13 @@
 #define mlock sgxssl_mlock
 #define madvise sgxssl_madvise
 
+
+#define fgets sgxssl_fgets
+#define fread   sgxssl_fread
+#define vfprintf  sgxssl_vfprintf
+#define fprintf sgxssl_fprintf
+#define printf sgxssl_printf
+
 #define fopen sgxssl_fopen
 #define fclose sgxssl_fclose
 #define ferror sgxssl_ferror
@@ -201,7 +208,7 @@
 #endif
 
 #define pipe sgxssl_pipe
-#define __read_alias sgxssl_read
+#define read sgxssl_read
 #define write sgxssl_write
 #define close sgxssl_close
 

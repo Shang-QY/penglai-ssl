@@ -30,7 +30,7 @@
  */
  
 #include <stdlib.h>
-#include "sgx_tsgxssl_t.h"
+#include "tcommon.h"
 
 // Following enum is copied from /usr/include/ctype.h.
 // It is used to populate the ascii_ctype table below.
@@ -171,12 +171,16 @@ const int32_t * ascii_to_lower_tb = &ascii_to_lower[128];
 
 const unsigned short int ** sgxssl___ctype_b_loc (void)
 {
-	return &ascii_ctype_tb;
+	FSTART;
+    FEND;
+    return &ascii_ctype_tb;
 }
 
 const int32_t **sgxssl___ctype_tolower_loc (void)
 {
-	return &ascii_to_lower_tb;
+	FSTART;
+    FEND;
+    return &ascii_to_lower_tb;
 }
 
 }

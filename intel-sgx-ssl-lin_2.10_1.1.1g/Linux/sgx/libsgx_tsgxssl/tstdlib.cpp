@@ -56,23 +56,27 @@ SGX_ACCESS_VERSION(tssl, 1);
 extern "C" {
 
 #define MAX_ENV_BUF_LEN 4096
-static __thread char t_env_buf[MAX_ENV_BUF_LEN];
+static char t_env_buf[MAX_ENV_BUF_LEN];
 
 char *sgxssl_getenv(const char *name)
 {
+    FSTART;
     int ret = 0;
     int res;
     int buf_len = 0;
     
     if (t_env_buf == NULL || MAX_ENV_BUF_LEN <= 0) {
+        FEND;
         return NULL;
     }
    
     memset(t_env_buf, 0, MAX_ENV_BUF_LEN);
     res = ocall_cc_getenv(&ret, name, strlen(name), t_env_buf, MAX_ENV_BUF_LEN, &buf_len);
     if (res != CC_SSL_SUCCESS || ret <= 0 || ret != buf_len) {
+        FEND;
         return NULL;
     }
+    FEND;
     return t_env_buf;
 }
 
@@ -80,7 +84,9 @@ int sgxssl_atexit(void (*function)(void))
 {
 	// Do nothing, assuming that registered function does allocations cleanup.
 	// This should be fine, as sgx_destroy_enclave cleans everything inside of enclave.
-	return 0;
+	FSTART;
+    FEND;
+    return 0;
 }
 
 }

@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include "tcommon.h"
 
 #define	BUF		513	/* Maximum length of numeric string. */
 
@@ -809,12 +810,14 @@ doswitch:
 int
 sgxssl_sscanf(const char *str, const char *fmt, ...)
 {
-	int ret;
+	FSTART;
+    int ret;
 	va_list ap;
 
 	va_start(ap, fmt);
 	ret = sgxssl_vsscanf(str, strlen(str), fmt, ap);
 	va_end(ap);
+    FEND;
 	return (ret);
 }
 

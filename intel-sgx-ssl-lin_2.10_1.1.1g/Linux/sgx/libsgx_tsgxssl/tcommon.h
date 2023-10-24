@@ -40,7 +40,7 @@
 
 #define CC_SSL_SUCCESS 0
 
-#define DO_SGX_LOG
+// #define DO_SGX_LOG
 #define DO_SGX_WARN
 
 #define SGX_ERROR(...) sgx_print("TERROR: " __VA_ARGS__);

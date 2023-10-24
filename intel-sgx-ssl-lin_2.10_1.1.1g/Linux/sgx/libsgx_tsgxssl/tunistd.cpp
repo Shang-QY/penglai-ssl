@@ -122,8 +122,10 @@ long sgxssl_sysconf(int name)
 //Process ID is used as RNG entropy, SGXSSL use sgx_get_rand() hence this function is redundant.
 //
 int sgxssl_getpid() {
+    FSTART;
 
     SGX_UNREACHABLE_CODE(SET_ERRNO);
+    FEND;
     return 0;
 }
 
@@ -131,22 +133,27 @@ int sgxssl_getpid() {
 //
 int sgxssl_OPENSSL_issetugid()
 {
+    FSTART;
+    FEND;
     return 1;
 }
 
 //ENOSYS indicates that Function not implemented.
 //
 long sgxssl_syscall (long number, ...) {
+    FSTART;
     (void)(number);
     
     errno = ENOSYS;
+    FEND;
     return -1;
 }
 
 int sgxssl_stat(const char *path, struct stat *buf)
 {
-
+    FSTART;
     SGX_UNREACHABLE_CODE(SET_ERRNO);
+    FEND;
     return -1;
 }
 
